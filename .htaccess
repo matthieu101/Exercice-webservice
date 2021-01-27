@@ -1,0 +1,3 @@
+RewriteEngine On # Activer le module Rewrite
+RewriteRule ^books/?$ books.php [NC,L]
+RewriteRule ^[^/]+/(\d+)$ books.php?id=$1
