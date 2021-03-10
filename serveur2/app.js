@@ -1,142 +1,119 @@
 const express = require('express')
-const assert = require('assert');
-const axios = require('axios');
-const app = express()
-const port = 3000
+const booksManager = require('./BooksManager')
+const authorsManager = require('./AuthorsManager')
+const cartsManager = require('./CartsManager')
+require('dotenv').config()
 
-// middleware
-app.use(express.urlencoded({ extended: true }))
+// Define data api server
+const dataApi = express();
+dataApi.use(express.urlencoded({ extended: true }));
+
+// Define cart api server
+const cartApi = express();
+cartApi.use(express.urlencoded({ extended: true }));
 
 // Retrieve
 var MongoClient = require('mongodb').MongoClient;
-const { response } = require('express');
-
-// Connection URL
-const url = 'mongodb://localhost:27017';
 
 // Database Name
-const dbName = 'project';
-let db;
+let dbData;
+let dbCart;
 
 // Use connect method to connect to the server
-MongoClient.connect(url, function(err, client) {
-  assert.equal(null, err);
+MongoClient.connect(process.env.DB_HOST, function(err, client) {
   console.log("Connected successfully to server");
-
-  db = client.db(dbName);
-
+  dbData = client.db(process.env.SERVER_1_DB_NAME);
+  dbCart = client.db(process.env.SERVER_2_DB_NAME);
+  if (err) console.error(err);
 });
 
-app.get('/', (req, res) => {
-  res.send('Hello World!')
+dataApi.get('/', (req, res) => {
+  res.send('Hello data!')
 })
 
-app.get('/paniers', async (req,res) => {
-    try {
-        const docs = await db.collection('paniers').find({}).toArray()
-        res.status(200).json(docs)
-    } catch (err) {
-        console.log(err)
-        throw err
-    }
+dataApi.get('/books', (req, res) => {
+  booksManager.GetBooks(function(items) {
+    res.send(JSON.stringify(items));
+  });
 })
 
-app.post('/paniers/add', async (req,res) => {
-    res.send(insertPanier(req.body));
+dataApi.get('/book/:name', (req, res) => {
+  const nameBook = req.params.name;
+  booksManager.GetBook(nameBook,function(items) {
+    res.send(JSON.stringify(items));
+  });
+  
 })
 
-app.delete('/paniers/remove', async (req,res) => {
-    res.send(removePanier(req.body));
+dataApi.delete('/book/delete/:name', (req, res) => {
+  const nameBook = req.params.name;
+  res.send(booksManager.DeleteBook(nameBook));
 })
 
-app.delete('/paniers/confirme', async (req,res) => {
-    res.send(confirmePanier());
+dataApi.post('/books/add', (req, res) => {
+  res.send(booksManager.InsertBooks(req.body));
 })
 
-app.listen(port, () => {
-  console.log(`Example app listening at http://localhost:${port}`)
+dataApi.put('/books/update/:name', (req, res) => {
+  const nameBook = req.params.name;
+  res.send(booksManager.UpdateBooks(nameBook,req.body));
 })
 
-const insertPanier = async function(data) {
-    try {
-      console.log(data.bookId);
-      let response = await axios.get('http://127.0.0.1/Exercice-webservice/books/'+data.bookId);
-      console.log(response.data);
-      
-      const collection = db.collection('paniers');
-      let found;
-      collection.find({}).toArray(function(err, docs) {
-        found = docs.find(elementid => elementid.bookId == data.bookId);
-        console.log(found);
-      
-        if(response.data[0].stock - data.quantity >= 0)
-        {
-          if(found == undefined)
-          {
-              console.log("add");
-              myobj = {bookId : response.data[0].id, nameBook:response.data[0].name, quantity: data.quantity, tmpStock: response.data[0].stock - data.quantity}
-              collection.insertOne(myobj, function(err, res) {
-                  assert.equal(err, null);
-              });
-          }else{
-              console.log("update");
-              var myquery = { id: found.id };
-              var newvalues = { $set: {quantity: parseInt(found.quantity) + parseInt(data.quantity), tmpStock: parseInt(found.tmpStock) - parseInt(data.quantity) } };
-              collection.updateOne(myquery, newvalues, function(err, res) {
-                  if (err) throw err;
-                  console.log("1 document updated");
-              });
-          }
-        } else {
-            throw ("Pas en stock !")
-        }
-      });  
-    } catch (err) {
-        console.log(err)
-        throw err
-    }
-  }
+dataApi.put('/books/updateStock/:name', (req, res) => {
+  const nameBook = req.params.name;
+  res.send(booksManager.UpdateStockBook(nameBook,req.body.stock));
+})
 
-  const removePanier = async function(data) {
-    try {
-      const collection = db.collection('paniers');
-        myobj = {nameBook : data.nameBook}
-        collection.deleteOne(myobj, function(err, res) {
-            console.log("Removed the book with the field a equal to "+data.nameBook);
-        });    
-    } catch (err) {
-        console.log(err)
-        throw err
-    }
-  }
+dataApi.get('/authors', (req, res) => {
+  authorsManager.GetAuthors(function(items) {
+    console.log(items);
+    res.send(JSON.stringify(items));
+  });
+})
 
-  const confirmePanier = async function() {
-    try {
-        const collection = db.collection('paniers');
-        // Find some documents
-        collection.find({}).toArray(function(err, docs) {
-          docs.forEach(
-              async element => {
-                const params = new URLSearchParams()
-                params.append('stock', element.tmpStock)
-                const config = {
-                  headers: {
-                    'Content-Type': 'application/x-www-form-urlencoded'
-                  }
-                }
-                console.log(element)
-                let response = await axios.put('http://127.0.0.1/Exercice-webservice/books/'+element.bookId,params, config);
-                console.log(response.data);
-                var myquery = { id: element.id };
-                collection.deleteOne(myquery, function(err, obj) {
-                  if (err) throw err;
-                  console.log("1 document deleted");
-                });
-              }
-            );
-        }); 
-    } catch (err) {
-        console.log(err)
-        throw err
-    }
-  }
+dataApi.get('/author/:name', (req, res) => {
+  const nameBook = req.params.name;
+  authorsManager.GetAuthor(nameBoo,function(items) {
+    console.log(items);
+    res.send(JSON.stringify(items));
+  });
+})
+
+dataApi.delete('/author/delete/:name', (req, res) => {
+  const nameBook = req.params.name;
+  res.send(authorsManager.DeleteBook(nameBook));
+})
+
+dataApi.post('/authors/add', (req, res) => {
+  res.send(authorsManager.InsertAuthors(req.body));
+})
+
+dataApi.put('/authors/update/:name', (req, res) => {
+  const nameBook = req.params.name;
+  res.send(authorsManager.UpdateAuthors(nameBook));
+})
+
+
+/***************************************************************/
+
+cartApi.post('/cart/add', (req, res) => {
+  res.send(cartsManager.InsertCarts(req.body));
+})
+
+cartApi.put('/cart/addProduct/:id', (req, res) => {
+  const id = req.params.id;
+  res.send(cartsManager.AddProductCarts(id,req.body));
+})
+
+cartApi.put('/cart/confirmCart/:id', (req, res) => {
+  const id = req.params.id;
+  res.send(cartsManager.ConfirmeCarts(id));
+})
+
+  dataApi.listen(process.env.SERVER_1_PORT, () => {
+    console.log(`Example app listening at http://localhost:${process.env.SERVER_1_PORT}`)
+  })
+
+  cartApi.listen(process.env.SERVER_2_PORT, () => {
+    console.log(`Example app listening at http://localhost:${process.env.SERVER_2_PORT}`)
+  })
