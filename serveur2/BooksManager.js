@@ -14,11 +14,11 @@ async function runServer() {
     let o = JSON.parse(msg.toString());
     if(o.action === "buy") {
       GetBook(o.bookName,function(book) {
-        if(book.stock > 1) {
+        if(parseInt(book.stock) - parseInt(o.quantity) >= 0) {
           UpdateStockBook(o.bookName, parseInt(book.stock) - parseInt(o.quantity) )
           console.log("livres, décompte stock")
         } else {
-          // TODO
+          console.log("livres, il n'y pas assez de livre en stock")
           return;
         }
       })
